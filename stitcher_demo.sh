@@ -1,0 +1,1 @@
+python img_stitcher.py -i tile1/frame_000000.png tile2/frame_000000.png -c 0 0 0 98 -d 128 128 128 128

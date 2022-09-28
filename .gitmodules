@@ -1,0 +1,3 @@
+[submodule "STB-VMM"]
+	path = STB-VMM
+	url = git@github.com:RLado/STB-VMM.git
