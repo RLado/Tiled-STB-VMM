@@ -4,3 +4,7 @@
 
 # Python bytecode
 *.pyc
+
+# Misc
+trash/
+ckpt/
