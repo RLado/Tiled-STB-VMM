@@ -1,3 +1,6 @@
 # Videos and images
 *.mp4
 *.png
+
+# Python bytecode
+*.pyc
