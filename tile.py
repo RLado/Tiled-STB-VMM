@@ -2,7 +2,6 @@ import numpy as np
 from PIL import Image
 import cv2
 import argparse
-import img_stitcher
 from STB_VMM.utils import pad_img
 
 
@@ -42,32 +41,33 @@ def tile(img, tile_size = 128, overlap = 30):
     
     return tiles, frame.shape
 
+
+def stitch(tiles, frame_shape, stride = 98):
+    # Read tile_size
+    tile_size = tiles[0].shape[0]
+
+    # Generate placeholder black frame
+    s = np.zeros(frame_shape)
+
+    t = 0
+    for i in range(tile_size, frame_shape[1]+1, stride): # X axis
+        for j in range(tile_size, frame_shape[0]+1, stride): #Y axis
+            s[j-tile_size:j, i-tile_size:i] = tiles[t]
+            t += 1
+    t = 0
+    for i in range(tile_size, frame_shape[1]+1, stride*2): # X axis
+        for j in range(tile_size, frame_shape[0]+1, stride*2): #Y axis
+            s[j-tile_size:j, i-tile_size:i] = s[j-tile_size:j, i-tile_size:i]*.5 + tiles[t]*.5
+            t += 2
+        t += len(range(tile_size, frame_shape[0]+1, stride)) - 1
+
+    return s
+
+
 if __name__ == '__main__':
     tile_size = 128
     overlap = 30
     stride = tile_size-overlap
 
     tiles, frame_shape = tile('frame_test.png', tile_size, overlap)
-    s = np.zeros((tile_size, tile_size, 3))
-
-    t = 0
-    for i in range(0, frame_shape[1]-tile_size, stride): # X axis
-        for j in range(0, frame_shape[0]-tile_size, stride): #Y axis
-            s = img_stitcher.stitch(
-                    img_stitcher.img(
-                        s,
-                        (0, 0),
-                        (s.shape[1], s.shape[0])
-                    ),
-                    img_stitcher.img(
-                        tiles[t],
-                        (i, j),
-                        (tile_size, tile_size)
-                    ),
-                )
-            t += 1
-            print(t)
-
-    cv2.imwrite('result.png', s)
-
-
+    cv2.imwrite('result.png', stitch(tiles, frame_shape, stride = 98))
