@@ -137,12 +137,12 @@ def stitch(tiles, frame_shape, stride = 98):
 
 
 if __name__ == '__main__':
-    tile_size = 768
+    tile_size = 192
     overlap = 30
     stride = tile_size-overlap
     vid_path = './test_vid_short.mp4'
-    temp_path = '/dev/shm/tiled_fragments'
-    out_path = '/dev/shm/tiled_result'
+    temp_path = 'tiled_fragments'
+    out_path = './tiled_result.avi'
 
     print('Extracting frames...')
     _, fps, _, frames = vid2frames(vid_path, out_path=temp_path)
@@ -177,7 +177,7 @@ if __name__ == '__main__':
         run.main(stb_args)
 
     print('Stitching tiles...')
-    video = cv2.VideoWriter('result.avi', cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
+    video = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
     for i in range(len(frames)-1):
         t = []
         for f in tiles_files[i]:
