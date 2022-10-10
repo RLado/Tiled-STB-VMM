@@ -2,14 +2,19 @@ import numpy as np
 from PIL import Image
 import cv2
 import argparse
+import os
+
+# STB-VMM imports
+import sys
+sys.path.insert(1, './STB-VMM')
 from utils import pad_img
 import run
-import os
+
 
 class STB_args:
     def __init__(
             self,
-            amp, 
+            mag, 
             video_path, 
             save_dir,
             load_ckpt,
@@ -25,7 +30,7 @@ class STB_args:
         self.load_ckpt = load_ckpt
         self.save_dir = save_dir
         self.device = device
-        self.amp = amp
+        self.mag = mag
         self.mode = mode
         self.video_path = video_path
         self.num_data = num_data
@@ -44,10 +49,10 @@ def vid2frames(vid_path, out_path = '.', crop = None): #Frame extractor function
             coordinate and Width + Height, e.g. ((0,0),(100,100)). Default = None
 
     Returns:
-        tuple: True if sucessful; Framerate; Frame count
+        tuple: True if sucessful; Framerate; Frame count; List of frames' paths
 
     """
-
+    
     vidObj = cv2.VideoCapture(vid_path)
     fps = vidObj.get(cv2.CAP_PROP_FPS) # Get framerate
 
@@ -137,7 +142,7 @@ def stitch(tiles, frame_shape, stride = 98):
 
 
 if __name__ == '__main__':
-    tile_size = 192
+    tile_size = 256
     overlap = 30
     stride = tile_size-overlap
     vid_path = './test_vid_short.mp4'
@@ -157,13 +162,11 @@ if __name__ == '__main__':
                 os.makedirs(os.path.join(temp_path,f'tile_{j}'))
             cv2.imwrite(os.path.join(temp_path,f'tile_{j}',f'fragment_{str(i).zfill(6)}.png'), t)
             tiles_files[-1].append(os.path.join(temp_path,f'tile_mag_{j}',f'STBVMM_static_{str(i).zfill(6)}.png'))
-    #tiles_files = list(zip(*tiles_files))
-    #print(tiles_files) #CHECK HERE AS WELL
 
     print('Computing magnification...')
     for j in range(len(tiles)):
         stb_args = STB_args(
-            amp = 20,
+            mag = 20,
             video_path = os.path.join(temp_path,f'tile_{j}')+'/fragment',
             save_dir = os.path.join(temp_path,f'tile_mag_{j}'),
             load_ckpt = './ckpt/ckpt_e49.pth.tar',
