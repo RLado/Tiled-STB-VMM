@@ -3,6 +3,7 @@ from PIL import Image
 import cv2
 import argparse
 import os
+import shutil
 
 # STB-VMM imports
 import sys
@@ -142,50 +143,85 @@ def stitch(tiles, frame_shape, stride = 98):
 
 
 if __name__ == '__main__':
-    tile_size = 256
-    overlap = 30
-    stride = tile_size-overlap
-    vid_path = './test_vid_short.mp4'
-    temp_path = 'tiled_fragments'
-    out_path = './tiled_result.avi'
+    parser = argparse.ArgumentParser(description='Tiled STB-VMM: Break large videos into tiles, magnify those tiles and stitch\'em together. Makes large videos processable with low amounts of RAM ')
+
+    # Application parameters
+    parser.add_argument('-i', '--video_path', type=str, metavar='PATH', required=True,
+                        help='path to video input frames')
+    parser.add_argument('--temp', type=str, default='/dev/shm/temp_STB-VMM', metavar='PATH', help='path to save temporal data (deleted on exit) (default: /dev/shm/temp_STB-VMM)')
+    parser.add_argument('-c', '--load_ckpt', type=str, metavar='PATH', required=True,
+                        help='path to load checkpoint')
+    parser.add_argument('-o', '--output', default='demo.avi', type=str, metavar='PATH',
+                        help='path to save generated frames (default: demo.avi)')
+    parser.add_argument('-m', '--mag', metavar='N', default=20.0, type=float,
+                        help='magnification factor (default: 20.0)')
+    parser.add_argument('--mode', default='static', type=str, choices=['static', 'dynamic'],
+                        help='magnification mode (static, dynamic)')
+
+    # Execute parameters
+    parser.add_argument('-t', '--tile_size', type=int, default=512, metavar='T', 
+                        choices=[64,128,192,256,320,384,448,512,576,640,704,768,832,896], 
+                        help='size of the tiles to be processed. The bigger the tile the faster magnification runs, as long as the tile fits in VRAM')
+    parser.add_argument('--overlap', type=int, default=30, metavar='O', 
+                        help='tile edge overlap in pixels (default: 30)')
+    parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
+                        help='number of data loading workers (default: 16)')
+    parser.add_argument('-b', '--batch_size', default=1, type=int, metavar='N', 
+                        help='batch size (default: 1)')
+    parser.add_argument('-p', '--print_freq', default=100, type=int, metavar='N', 
+                        help='print frequency (default: 100)')
+
+    # Device
+    parser.add_argument('--device', type=str, default='auto',
+                        choices=['auto', 'cpu', 'cuda'],
+                        help='select device [auto/cpu/cuda] (default: auto)')
+
+    args = parser.parse_args()
+
+    stride = args.tile_size-args.overlap
 
     print('Extracting frames...')
-    _, fps, _, frames = vid2frames(vid_path, out_path=temp_path)
+    _, fps, _, frames = vid2frames(args.video_path, out_path=args.temp)
 
     print('Splitting tiles...')
     tiles_files = []
     for i, f in enumerate(frames):
         tiles_files.append([])
-        tiles, frame_shape = tile(f, tile_size, overlap)
+        tiles, frame_shape = tile(f, args.tile_size, args.overlap)
         for j, t in enumerate(tiles):
-            if not os.path.exists(os.path.join(temp_path,f'tile_{j}')):
-                os.makedirs(os.path.join(temp_path,f'tile_{j}'))
-            cv2.imwrite(os.path.join(temp_path,f'tile_{j}',f'fragment_{str(i).zfill(6)}.png'), t)
-            tiles_files[-1].append(os.path.join(temp_path,f'tile_mag_{j}',f'STBVMM_static_{str(i).zfill(6)}.png'))
+            if not os.path.exists(os.path.join(args.temp,f'tile_{j}')):
+                os.makedirs(os.path.join(args.temp,f'tile_{j}'))
+            cv2.imwrite(os.path.join(args.temp,f'tile_{j}',f'fragment_{str(i).zfill(6)}.png'), t)
+            tiles_files[-1].append(os.path.join(args.temp,f'tile_mag_{j}',f'STBVMM_static_{str(i).zfill(6)}.png'))
 
     print('Computing magnification...')
     for j in range(len(tiles)):
         stb_args = STB_args(
-            mag = 20,
-            video_path = os.path.join(temp_path,f'tile_{j}')+'/fragment',
-            save_dir = os.path.join(temp_path,f'tile_mag_{j}'),
-            load_ckpt = './ckpt/ckpt_e49.pth.tar',
+            mag = args.mag,
+            video_path = os.path.join(args.temp,f'tile_{j}')+'/fragment',
+            save_dir = os.path.join(args.temp,f'tile_mag_{j}'),
+            load_ckpt = args.load_ckpt,
             num_data = len(frames)-2,
-            mode = 'static',
-            device = 'auto',
-            workers = 4, 
-            batch_size = 1,
-            print_freq = 10
+            mode = args.mode,
+            device = args.device,
+            workers = args.workers, 
+            batch_size = args.batch_size,
+            print_freq = args.print_freq
         )
         run.main(stb_args)
 
     print('Stitching tiles...')
-    video = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
+    video = cv2.VideoWriter(args.output, cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
     for i in range(len(frames)-1):
         t = []
         for f in tiles_files[i]:
             t.append(cv2.imread(f))
-        if not os.path.exists(out_path):
-            os.makedirs(out_path)
+        if not os.path.exists(args.output):
+            os.makedirs(args.output)
         video.write(cv2.resize(stitch(t, frame_shape, stride = stride), (frame_shape[1], frame_shape[0])))
     video.release()
+
+    print('Cleaning up temporary files...')
+    shutil.rmtree(args.temp)
+    print('Done')
+    
