@@ -24,10 +24,10 @@ For this example we place the checkpoint in *./STB-VMM/ckpt/ckpt_e49.pth.tar*. Y
 To magnify x20 a *sample_video.mp4* with a tile size of 512px use:
 
 ```bash
-python run.py -i sample_video.mp4 -c STB-VMM/ckpt/ckpt_e49.pth.tar -m 20 -t 512 
+python magnify.py -i sample_video.mp4 -c STB-VMM/ckpt/ckpt_e49.pth.tar -m 20 -t 512 
 ```
 
-For more information regarding options and parameters read the output of ```run.py -h```:
+For more information regarding options and parameters read the output of ```magnify.py -h```:
 
 ```
 Tiled STB-VMM: Break large videos into tiles, magnify those tiles and stitch'em together. Makes large videos processable with
