@@ -258,8 +258,9 @@ if __name__ == '__main__':
         pb['value'] = 100
         value_label['text'] = f"Cleaning up temporary files: {pb['value']:.2f}%  [5/5]"
         showinfo(message=f'{os.path.basename(args.video_path)} x{args.mag} completed!')
-        root.destroy()
         print('Done')
+        root.quit()
+        exit(0)
     
     # Progress bar GUI
     # Define root window for tkinter
