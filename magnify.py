@@ -11,6 +11,12 @@ sys.path.insert(1, './STB-VMM')
 from utils import pad_img
 import run
 
+# Progressbar imports
+from tkinter import ttk
+import tkinter as tk
+from tkinter.messagebox import showinfo
+import threading
+
 
 class STB_args:
     def __init__(
@@ -178,50 +184,107 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    stride = args.tile_size-args.overlap
+    # Main processing function
+    def mag_process():
+        stride = args.tile_size-args.overlap
 
-    print('Extracting frames...')
-    _, fps, _, frames = vid2frames(args.video_path, out_path=args.temp)
+        print('Extracting frames...')
+        # Update progressbar
+        pb['value'] = 0
+        value_label['text'] = f"Extracting frames: {pb['value']:.2f}%  [1/5]"
+        # Extract frames
+        _, fps, _, frames = vid2frames(args.video_path, out_path=args.temp)
+        # Update progressbar
+        pb['value'] = 100
+        value_label['text'] = f"Extracting frames: {pb['value']:.2f}%  [1/5]"
 
-    print('Splitting tiles...')
-    tiles_files = []
-    for i, f in enumerate(frames):
-        tiles_files.append([])
-        tiles, frame_shape = tile(f, args.tile_size, args.overlap)
-        for j, t in enumerate(tiles):
-            if not os.path.exists(os.path.join(args.temp,f'tile_{j}')):
-                os.makedirs(os.path.join(args.temp,f'tile_{j}'))
-            cv2.imwrite(os.path.join(args.temp,f'tile_{j}',f'fragment_{str(i).zfill(6)}.png'), t)
-            tiles_files[-1].append(os.path.join(args.temp,f'tile_mag_{j}',f'STBVMM_static_{str(i).zfill(6)}.png'))
+        print('Splitting tiles...')
+        tiles_files = []
+        for i, f in enumerate(frames):
+            # Update progressbar
+            pb['value'] = i/len(frames) * 100
+            value_label['text'] = f"Splitting tiles: {pb['value']:.2f}%  [2/5]"
+            # Split tiles
+            tiles_files.append([])
+            tiles, frame_shape = tile(f, args.tile_size, args.overlap)
+            for j, t in enumerate(tiles):
+                if not os.path.exists(os.path.join(args.temp,f'tile_{j}')):
+                    os.makedirs(os.path.join(args.temp,f'tile_{j}'))
+                cv2.imwrite(os.path.join(args.temp,f'tile_{j}',f'fragment_{str(i).zfill(6)}.png'), t)
+                tiles_files[-1].append(os.path.join(args.temp,f'tile_mag_{j}',f'STBVMM_static_{str(i).zfill(6)}.png'))
 
-    print('Computing magnification...')
-    for j in range(len(tiles)):
-        stb_args = STB_args(
-            mag = args.mag,
-            video_path = os.path.join(args.temp,f'tile_{j}')+'/fragment',
-            save_dir = os.path.join(args.temp,f'tile_mag_{j}'),
-            load_ckpt = args.load_ckpt,
-            num_data = len(frames)-2,
-            mode = args.mode,
-            device = args.device,
-            workers = args.workers, 
-            batch_size = args.batch_size,
-            print_freq = args.print_freq
-        )
-        run.main(stb_args)
+        print('Computing magnification...')
+        for j in range(len(tiles)):
+            # Update progressbar
+            pb['value'] = j/len(tiles) * 100
+            value_label['text'] = f"Computing magnification: {pb['value']:.2f}%  [3/5]"
+            # Compute magnification
+            stb_args = STB_args(
+                mag = args.mag,
+                video_path = os.path.join(args.temp,f'tile_{j}')+'/fragment',
+                save_dir = os.path.join(args.temp,f'tile_mag_{j}'),
+                load_ckpt = args.load_ckpt,
+                num_data = len(frames)-2,
+                mode = args.mode,
+                device = args.device,
+                workers = args.workers, 
+                batch_size = args.batch_size,
+                print_freq = args.print_freq
+            )
+            run.main(stb_args)
 
-    print('Stitching tiles...')
-    video = cv2.VideoWriter(args.output, cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
-    for i in range(len(frames)-1):
-        t = []
-        for f in tiles_files[i]:
-            t.append(cv2.imread(f))
-        if not os.path.exists(args.output):
-            os.makedirs(args.output)
-        video.write(cv2.resize(stitch(t, frame_shape, stride = stride), (frame_shape[1], frame_shape[0])))
-    video.release()
+        print('Stitching tiles...')
+        video = cv2.VideoWriter(args.output, cv2.VideoWriter_fourcc(*'DIVX'), fps, (frame_shape[1], frame_shape[0]))
+        for i in range(len(frames)-1):
+            # Update progressbar
+            pb['value'] = i/(len(frames)-1) * 100
+            value_label['text'] = f"Stitching tiles: {pb['value']:.2f}%  [4/5]"
+            # Stitch tiles
+            t = []
+            for f in tiles_files[i]:
+                t.append(cv2.imread(f))
+            if not os.path.exists(args.output):
+                os.makedirs(args.output)
+            video.write(cv2.resize(stitch(t, frame_shape, stride = stride), (frame_shape[1], frame_shape[0])))
+        video.release()
 
-    print('Cleaning up temporary files...')
-    shutil.rmtree(args.temp)
-    print('Done')
+        print('Cleaning up temporary files...')
+        # Update progressbar
+        pb['value'] = 0
+        value_label['text'] = f"Cleaning up temporary files: {pb['value']:.2f}%  [5/5]"
+        # Clean up
+        shutil.rmtree(args.temp)
+        # Update progressbar
+        pb['value'] = 100
+        value_label['text'] = f"Cleaning up temporary files: {pb['value']:.2f}%  [5/5]"
+        showinfo(message=f'{os.path.basename(args.video_path)} x{args.mag} completed!')
+        print('Done')
+    
+    # Progress bar GUI
+    # Define root window for tkinter
+    root = tk.Tk()
+    root.geometry('600x120')
+    root.title(f'Magnifying: {os.path.basename(args.video_path)} x{args.mag}')
+    root.resizable(False, False)
+
+    # Progressbar
+    pb = ttk.Progressbar(
+        root,
+        orient='horizontal',
+        mode='determinate',
+        length=580
+    )
+    # Place the progressbar
+    pb.grid(column=0, row=0, columnspan=2, padx=10, pady=20)
+
+    # Label
+    value_label = ttk.Label(root, text='')
+    value_label.grid(column=0, row=1, columnspan=2)
+
+    # Start magnification thread
+    mag_thread = threading.Thread(target=mag_process, args=())
+    mag_thread.start()
+
+    # Start tkinter main thread (progress bar)
+    root.mainloop()
     
