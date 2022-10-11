@@ -167,7 +167,7 @@ if __name__ == '__main__':
     # Execute parameters
     parser.add_argument('-t', '--tile_size', type=int, default=512, metavar='T', 
                         choices=[64, 128, 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088, 1152, 1216], 
-                        help='size of the tiles to be processed. The bigger the tile the faster magnification runs, as long as the tile fits in VRAM')
+                        help='size of the tiles to be processed. The bigger the tile the faster magnification runs, as long as the tile fits in VRAM (default: 512')
     parser.add_argument('--overlap', type=int, default=30, metavar='O', 
                         help='tile edge overlap in pixels (default: 30)')
     parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
